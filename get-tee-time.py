@@ -63,7 +63,7 @@ def login_and_navigate_0_3():
     firefox_options.add_argument("-headless")
     driver = webdriver.Firefox(options=firefox_options)
                  
-    login_url = "https://foreupsoftware.com/index.php/booking/19347#/1487/login"
+    login_url = "https://foreupsoftware.com/index.php/booking/19347#/login"
     teetimes_url = "https://foreupsoftware.com/index.php/booking/19347/1487#/teetimes"
 
     # Login process
@@ -100,7 +100,7 @@ def login_and_navigate_4_90():
     firefox_options.add_argument("-headless")
     driver = webdriver.Firefox(options=firefox_options)
 
-    login_url = "https://foreupsoftware.com/index.php/booking/19347#/1487/login"
+    login_url = "https://foreupsoftware.com/index.php/booking/19347#/login"
     teetimes_url = "https://foreupsoftware.com/index.php/booking/19347/1487#/teetimes"
 
     # Login process
