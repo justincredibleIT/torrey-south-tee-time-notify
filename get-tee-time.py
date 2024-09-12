@@ -36,6 +36,25 @@ def load_config():
     }
     return config
 
+TWILIGHT_SCHEDULE = [
+    (datetime(2024, 1, 2), datetime(2024, 1, 15), "12:30pm"),
+    (datetime(2024, 1, 31), datetime(2024, 3, 9), "1:00pm"),
+    (datetime(2024, 3, 10), datetime(2024, 4, 7), "2:00pm"),
+    (datetime(2024, 4, 8), datetime(2024, 5, 5), "2:30pm"),
+    (datetime(2024, 5, 6), datetime(2024, 8, 11), "3:00pm"),
+    (datetime(2024, 8, 12), datetime(2024, 9, 8), "2:30pm"),
+    (datetime(2024, 9, 9), datetime(2024, 9, 29), "2:00pm"),
+    (datetime(2024, 9, 30), datetime(2024, 11, 2), "1:30pm"),
+    (datetime(2024, 11, 3), datetime(2025, 1, 1), "12:00pm"),
+]
+
+def get_twilight_start_time(date):
+    for start_date, end_date, twilight_time in TWILIGHT_SCHEDULE:
+        if start_date <= date <= end_date:
+            return twilight_time
+    return None
+
+
 # Example usage:
 config = load_config()
 username = config["TEE_TIMES_USERNAME"]
@@ -128,79 +147,6 @@ def login_and_navigate_4_90():
     logger.info("Login and navigation successful for 4-90 days")
     return driver
 
-# # Function to get tee times
-# def get_tee_times(driver):
-#     logger.info("Getting tee times")
-#     tee_times = {}
-
-#     datepicker_days = WebDriverWait(driver, 10).until(
-#         EC.visibility_of_element_located((By.CLASS_NAME, 'datepicker-days'))
-#     )
-
-#     month_year_text = datepicker_days.find_element(By.CLASS_NAME, 'datepicker-switch').text.strip().split()
-#     month, year = month_year_text[0], month_year_text[1]
-
-#     day_elements = datepicker_days.find_elements(By.XPATH, ".//td[contains(@class, 'day') and not(contains(@class, 'old')) and not(contains(@class, 'disabled'))]")
-
-#     active_day_index = next(
-#         (i for i, day in enumerate(day_elements) if 'active' in day.get_attribute("class")),
-#         None
-#     )
-
-#     for i in range(active_day_index, len(day_elements)):
-#         datepicker_days = WebDriverWait(driver, 10).until(
-#             EC.visibility_of_element_located((By.CLASS_NAME, 'datepicker-days'))
-#         )
-#         day_elements = datepicker_days.find_elements(By.XPATH, ".//td[contains(@class, 'day') and not(contains(@class, 'old')) and not(contains(@class, 'disabled'))]")
-
-#         day_elements[i].click()
-#         time.sleep(2)
-
-#         month_year_text = datepicker_days.find_element(By.CLASS_NAME, 'datepicker-switch').text.strip().split()
-#         month, year = month_year_text[0], month_year_text[1]
-#         active_day_element = datepicker_days.find_element(By.XPATH, ".//td[contains(@class, 'active')]")
-#         day = active_day_element.text.strip()
-
-#         date = f"{month} {day}, {year}"
-#         day_of_week = datetime.strptime(date, "%B %d, %Y").strftime("%A")
-#         date_with_day = f"{day_of_week} {date}"
-
-#         try:
-#             booking_start_time_labels = WebDriverWait(driver, 10).until(
-#                 EC.presence_of_all_elements_located((By.CLASS_NAME, 'booking-start-time-label'))
-#             )
-
-#             booking_slot_details = WebDriverWait(driver, 10).until(
-#                 EC.presence_of_all_elements_located((By.CLASS_NAME, 'booking-slot-details'))
-#             )
-
-#             daygolf_tee_times = []
-#             twilight_tee_times = []
-
-#             for label, slot_detail in zip(booking_start_time_labels, booking_slot_details):       # for label in booking_start_time_labels:
-#                 time_str = label.text
-#                 slot_detail_str = slot_detail.text
-#                 time_obj = datetime.strptime(time_str, "%I:%M%p")
-#                 hour_as_int = int(time_obj.strftime("%H"))
-
-#                 if hour_as_int < 15:
-#                     daygolf_tee_times.append(f"{time_str} - {slot_detail_str}")
-#                 else:
-#                     twilight_tee_times.append(f"{time_str} - {slot_detail_str}")
-
-#             tee_times[date_with_day] = {
-#                 "daygolf": daygolf_tee_times,
-#                 "twilight": twilight_tee_times
-#             }
-
-#         except Exception as e:
-#             logger.error(f"No booking start time labels found for {date_with_day}: {e}")
-#             continue
-
-#     logger.info("Tee times retrieval successful")
-#     return tee_times
-############################## trying#############################
-
 # Function to get tee times
 def get_tee_times(driver):
     logger.info("Getting tee times")
@@ -238,6 +184,8 @@ def get_tee_times(driver):
             date = f"{month} {day}, {year}"
             day_of_week = datetime.strptime(date, "%B %d, %Y").strftime("%A")
             date_with_day = f"{day_of_week} {date}"
+            date_obj = datetime.strptime(date, "%B %d, %Y")
+            twilight_start_time = get_twilight_start_time(date_obj)
 
             # Now check for both "booking-start-time-label" and "booking-slot-details"
             try:
@@ -258,14 +206,9 @@ def get_tee_times(driver):
                     holes = slot.find_element(By.CLASS_NAME, 'booking-slot-holes').text.strip()
                     players = slot.find_element(By.CLASS_NAME, 'booking-slot-players').text.strip()
                     details = f"Holes: {holes}, Players: {players}"
-                    #details = slot.text  # You can log these or process them further as needed
 
-                     # Split the time string and ignore the slot details when parsing
-                    time_only = time_str.split(" ")[0]  # This will isolate just the time part (e.g., "4:50pm")
+                    time_only = time_str.split(" ")[0] 
 
-                    # Parse the time string to check if it's daygolf or twilight
-                    # time_obj = datetime.strptime(time_str, "%I:%M%p")
-                    # hour_as_int = int(time_obj.strftime("%H"))
                     try:
                         time_obj = datetime.strptime(time_only, "%I:%M%p")
                     except ValueError as ve:
@@ -273,15 +216,13 @@ def get_tee_times(driver):
                         continue
 
                     hour_as_int = int(time_obj.strftime("%H"))
-                    # if hour_as_int < 15:
-                    #     daygolf_tee_times.append(time_str)
-                    # else:
-                    #     twilight_tee_times.append(time_str)
+                    time_str_24 = time_obj.strftime("%H:%M")
+                    twilight_time = get_twilight_start_time(date_obj)
 
-                    if hour_as_int < 15:
-                        daygolf_tee_times.append(f"{time_str} - {details}")  # Add slot details
+                    if twilight_start_time and datetime.strptime(time_str_24, "%H:%M") >= datetime.strptime(twilight_start_time, "%I:%M%p"):
+                        twilight_tee_times.append(f"{time_str} - {details}")
                     else:
-                        twilight_tee_times.append(f"{time_str} - {details}")  # Add slot details
+                        daygolf_tee_times.append(f"{time_str} - {details}")
 
 
                 # Add to tee_times dictionary
@@ -300,21 +241,14 @@ def get_tee_times(driver):
     logger.info("Tee times retrieval successful")
     return tee_times
 
-
-########################## trying #################################
 # Function to compare tee times and find new ones
 def compare_tee_times(previous, current, alert_start_time, alert_end_time):
     new_tee_times = {}
 
     # Log the alert time range for troubleshooting
     logger.info(f"Alert Time Range: {alert_start_time} - {alert_end_time}")
-
-    # Define a helper function to check if a given time string is within the specified time range
-    # def is_within_time_range(time_str, start_time, end_time):
-    #     time_obj = datetime.strptime(time_str, "%I:%M%p").time()
-    #     return start_time <= time_obj <= end_time
     def is_within_time_range(time_str, start_time, end_time):
-        # Split the time part and the slot details, then parse only the time part
+
         time_only = time_str.split(" ")[0]
         try:
             time_obj = datetime.strptime(time_only, "%I:%M%p").time()
@@ -365,7 +299,7 @@ def send_email(new_tee_times):
     logger.info("Sending email with new tee times")
 
     from_address = email_from
-    to_address = email_to
+    to_address = email_to.split(',')
 
     subject_days = ", ".join(new_tee_times.keys())
 
@@ -390,7 +324,6 @@ def send_email(new_tee_times):
 
     msg = MIMEMultipart()
     msg['From'] = "Golf Tee Time Bot"  # Change the sender name here
-    msg['To'] = to_address
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
