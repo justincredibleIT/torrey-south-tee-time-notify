@@ -32,7 +32,10 @@ def load_config():
         "EMAIL_FROM": os.getenv("EMAIL_FROM", ""),
         "EMAIL_TO": os.getenv("EMAIL_TO", ""),
         "GMAIL_APP_PASSWORD": os.getenv("GMAIL_APP_PASSWORD", ""),
-        "ALERT_TIMES": os.getenv("ALERT_TIMES", "")
+        "ALERT_TIMES_WEEKDAY": os.getenv("ALERT_TIMES_WEEKDAY", ""),
+        "ALERT_TIMES_WEEKEND": os.getenv("ALERT_TIMES_WEEKEND", "")
+        # "ALERT_TIMES": os.getenv("ALERT_TIMES", "")
+        # "ALERT_TIMES": os.getenv("ALERT_TIMES", "")
     }
     return config
 
@@ -54,7 +57,6 @@ def get_twilight_start_time(date):
             return twilight_time
     return None
 
-
 # Example usage:
 config = load_config()
 username = config["TEE_TIMES_USERNAME"]
@@ -62,28 +64,38 @@ password = config["TEE_TIMES_PASSWORD"]
 email_from = config["EMAIL_FROM"]
 email_to = config["EMAIL_TO"]
 gmail_app_password = config["GMAIL_APP_PASSWORD"]
-alert_times = config["ALERT_TIMES"]
+alert_times_weekday = config["ALERT_TIMES_WEEKDAY"]
+alert_times_weekend = config["ALERT_TIMES_WEEKEND"]
+# alert_times = config["ALERT_TIMES"]
 
 # Parse alert times
-alert_start_time, alert_end_time = alert_times.split('-')
-alert_start_time = datetime.strptime(alert_start_time.strip(), "%H:%M").time()
-alert_end_time = datetime.strptime(alert_end_time.strip(), "%H:%M").time()
+# alert_start_time, alert_end_time = alert_times.split('-')
+# alert_start_time = datetime.strptime(alert_start_time.strip(), "%H:%M").time()
+# alert_end_time = datetime.strptime(alert_end_time.strip(), "%H:%M").time()
+
+alert_start_time_weekday, alert_end_time_weekday = alert_times_weekday.split('-')
+alert_start_time_weekday = datetime.strptime(alert_start_time_weekday.strip(), "%H:%M").time()
+alert_end_time_weekday = datetime.strptime(alert_end_time_weekday.strip(), "%H:%M").time()
+
+alert_start_time_weekend, alert_end_time_weekend = alert_times_weekend.split('-')
+alert_start_time_weekend = datetime.strptime(alert_start_time_weekend.strip(), "%H:%M").time()
+alert_end_time_weekend = datetime.strptime(alert_end_time_weekend.strip(), "%H:%M").time()
 
 # Log loaded configuration
 logger.info(f"Loaded configuration: {config}")
-logger.info(f"Alert Time Range: {alert_start_time} - {alert_end_time}")
+#logger.info(f"Alert Time Range: {alert_start_time} - {alert_end_time}")
 
 # Function to log in and navigate to the tee times page for 0-3 days
-def login_and_navigate_0_3():
+def login_and_navigate():
     logger.info("Starting login and navigation process for 0-3 days")
 
     # Set up Firefox options
     firefox_options = Options()
     firefox_options.add_argument("-headless")
     driver = webdriver.Firefox(options=firefox_options)
-                 
+
     login_url = "https://foreupsoftware.com/index.php/booking/19347#/login"
-    teetimes_url = "https://foreupsoftware.com/index.php/booking/19347/1487#/teetimes"
+    teetimes_url = "https://foreupsoftware.com/index.php/booking/19347#/teetimes"
 
     # Login process
     driver.get(login_url)
@@ -147,7 +159,6 @@ def login_and_navigate_4_90():
     logger.info("Login and navigation successful for 4-90 days")
     return driver
 
-# Function to get tee times
 def get_tee_times(driver):
     logger.info("Getting tee times")
     tee_times = {}
@@ -206,7 +217,7 @@ def get_tee_times(driver):
                     holes = slot.find_element(By.CLASS_NAME, 'booking-slot-holes').text.strip()
                     players = slot.find_element(By.CLASS_NAME, 'booking-slot-players').text.strip()
                     details = f"Holes: {holes}, Players: {players}"
-
+ 
                     time_only = time_str.split(" ")[0] 
 
                     try:
@@ -241,14 +252,14 @@ def get_tee_times(driver):
     logger.info("Tee times retrieval successful")
     return tee_times
 
-# Function to compare tee times and find new ones
-def compare_tee_times(previous, current, alert_start_time, alert_end_time):
+def compare_tee_times(previous, current, alert_start_time_weekday, alert_end_time_weekday, alert_start_time_weekend, alert_end_time_weekend):
     new_tee_times = {}
 
     # Log the alert time range for troubleshooting
-    logger.info(f"Alert Time Range: {alert_start_time} - {alert_end_time}")
-    def is_within_time_range(time_str, start_time, end_time):
+    #logger.info(f"Alert Time Range: {alert_start_time} - {alert_end_time}")
 
+    def is_within_time_range(time_str, start_time, end_time):
+        # Split the time part and the slot details, then parse only the time part
         time_only = time_str.split(" ")[0]
         try:
             time_obj = datetime.strptime(time_only, "%I:%M%p").time()
@@ -256,12 +267,19 @@ def compare_tee_times(previous, current, alert_start_time, alert_end_time):
         except ValueError as e:
             logger.error(f"Error parsing time '{time_only}': {e}")
             return False
-
-
     for date, times in current.items():
+        # Determine if today is a weekend or weekday
+        day_of_week = datetime.strptime(date, "%A %B %d, %Y").strftime("%A")
+        if day_of_week in ["Friday", "Saturday", "Sunday"]:
+            start_time = alert_start_time_weekend
+            end_time = alert_end_time_weekend
+        else:
+            start_time = alert_start_time_weekday
+            end_time = alert_end_time_weekday
+
         if date not in previous:
-            new_daygolf_times = [time_str for time_str in times["daygolf"] if is_within_time_range(time_str, alert_start_time, alert_end_time)]
-            new_twilight_times = [time_str for time_str in times["twilight"] if is_within_time_range(time_str, alert_start_time, alert_end_time)]
+            new_daygolf_times = [time_str for time_str in times["daygolf"] if is_within_time_range(time_str, start_time, end_time)]
+            new_twilight_times = [time_str for time_str in times["twilight"] if is_within_time_range(time_str, start_time, end_time)]
 
             if new_daygolf_times or new_twilight_times:
                 new_tee_times[date] = {
@@ -272,8 +290,8 @@ def compare_tee_times(previous, current, alert_start_time, alert_end_time):
             new_daygolf_times = list(set(times["daygolf"]) - set(previous[date]["daygolf"]))
             new_twilight_times = list(set(times["twilight"]) - set(previous[date]["twilight"]))
 
-            alert_daygolf_times = [time_str for time_str in new_daygolf_times if is_within_time_range(time_str, alert_start_time, alert_end_time)]
-            alert_twilight_times = [time_str for time_str in new_twilight_times if is_within_time_range(time_str, alert_start_time, alert_end_time)]
+            alert_daygolf_times = [time_str for time_str in new_daygolf_times if is_within_time_range(time_str, start_time, end_time)]
+            alert_twilight_times = [time_str for time_str in new_twilight_times if is_within_time_range(time_str, start_time, end_time)]
 
             if alert_daygolf_times or alert_twilight_times:
                 new_tee_times[date] = {
@@ -293,6 +311,41 @@ def compare_tee_times(previous, current, alert_start_time, alert_end_time):
                         logger.info(tee_time)
 
     return new_tee_times
+    # for date, times in current.items():
+    #     if date not in previous:
+    #         new_daygolf_times = [time_str for time_str in times["daygolf"] if is_within_time_range(time_str, alert_start_time, alert_end_time)]
+    #         new_twilight_times = [time_str for time_str in times["twilight"] if is_within_time_range(time_str, alert_start_time, alert_end_time)]
+
+    #         if new_daygolf_times or new_twilight_times:
+    #             new_tee_times[date] = {
+    #                 "daygolf": new_daygolf_times,
+    #                 "twilight": new_twilight_times
+    #             }
+    #     else:
+    #         new_daygolf_times = list(set(times["daygolf"]) - set(previous[date]["daygolf"]))
+    #         new_twilight_times = list(set(times["twilight"]) - set(previous[date]["twilight"]))
+
+    #         alert_daygolf_times = [time_str for time_str in new_daygolf_times if is_within_time_range(time_str, alert_start_time, alert_end_time)]
+    #         alert_twilight_times = [time_str for time_str in new_twilight_times if is_within_time_range(time_str, alert_start_time, alert_end_time)]
+
+    #         if alert_daygolf_times or alert_twilight_times:
+    #             new_tee_times[date] = {
+    #                 "daygolf": alert_daygolf_times,
+    #                 "twilight": alert_twilight_times
+    #             }
+
+    #             # Log tee times within the alert time range
+    #             logger.info(f"Tee times within the alert time range for {date}:")
+    #             if alert_daygolf_times:
+    #                 logger.info("Daygolf Tee Times:")
+    #                 for tee_time in alert_daygolf_times:
+    #                     logger.info(tee_time)
+    #             if alert_twilight_times:
+    #                 logger.info("Twilight Tee Times:")
+    #                 for tee_time in alert_twilight_times:
+    #                     logger.info(tee_time)
+
+    # return new_tee_times
 
 # Function to send email
 def send_email(new_tee_times):
@@ -303,7 +356,7 @@ def send_email(new_tee_times):
 
     subject_days = ", ".join(new_tee_times.keys())
 
-    subject = f"New Tee Times - Torrey Pines South - {subject_days}"
+    subject = f"New Tee Times - Torrey Pines North - {subject_days}"
 
     body = "New Tee Times:\n\n"
 
@@ -343,13 +396,12 @@ previous_tee_times = {}
 
 while True:
     try:
-        # Check tee times for 0-3 days
-        driver_0_3 = login_and_navigate_0_3()
-        current_tee_times_0_3 = get_tee_times(driver_0_3)
-        driver_0_3.quit()
+        driver = login_and_navigate()
+        current_tee_times = get_tee_times(driver)
+        driver.quit()
 
-        logger.info("All available tee times for 0-3 days:")
-        for date, times in current_tee_times_0_3.items():
+        logger.info("All available tee times:")
+        for date, times in current_tee_times.items():
             logger.info(f"Date: {date}")
             if times["daygolf"]:
                 logger.info("Daygolf Tee Times:")
@@ -360,11 +412,15 @@ while True:
                 for tee_time in times["twilight"]:
                     logger.info(tee_time)
 
-        new_tee_times_0_3 = compare_tee_times(previous_tee_times, current_tee_times_0_3, alert_start_time, alert_end_time)
+        new_tee_times = compare_tee_times(
+            previous_tee_times, current_tee_times,
+            alert_start_time_weekday, alert_end_time_weekday,
+            alert_start_time_weekend, alert_end_time_weekend
+        )
 
-        if new_tee_times_0_3:
-            logger.info("New Tee Times for 0-3 days:")
-            for date, times in new_tee_times_0_3.items():
+        if new_tee_times:
+            logger.info("New Tee Times:")
+            for date, times in new_tee_times.items():
                 logger.info(f"Date: {date}")
                 if times["daygolf"]:
                     logger.info("Daygolf Tee Times:")
@@ -375,51 +431,96 @@ while True:
                     for tee_time in times["twilight"]:
                         logger.info(tee_time)
 
-            send_email(new_tee_times_0_3)
+            send_email(new_tee_times)
         else:
-            logger.info("No new tee times available for 0-3 days.")
+            logger.info("No new tee times available.")
 
-        previous_tee_times.update(current_tee_times_0_3)
-
-        # Check tee times for 4-90 days
-        driver_4_90 = login_and_navigate_4_90()
-        current_tee_times_4_90 = get_tee_times(driver_4_90)
-        driver_4_90.quit()
-
-        logger.info("All available tee times for 4-90 days:")
-        for date, times in current_tee_times_4_90.items():
-            logger.info(f"Date: {date}")
-            if times["daygolf"]:
-                logger.info("Daygolf Tee Times:")
-                for tee_time in times["daygolf"]:
-                    logger.info(tee_time)
-            if times["twilight"]:
-                logger.info("Twilight Tee Times:")
-                for tee_time in times["twilight"]:
-                    logger.info(tee_time)
-
-        new_tee_times_4_90 = compare_tee_times(previous_tee_times, current_tee_times_4_90, alert_start_time, alert_end_time)
-
-        if new_tee_times_4_90:
-            logger.info("New Tee Times for 4-90 days:")
-            for date, times in new_tee_times_4_90.items():
-                logger.info(f"Date: {date}")
-                if times["daygolf"]:
-                    logger.info("Daygolf Tee Times:")
-                    for tee_time in times["daygolf"]:
-                        logger.info(tee_time)
-                if times["twilight"]:
-                    logger.info("Twilight Tee Times:")
-                    for tee_time in times["twilight"]:
-                        logger.info(tee_time)
-
-            send_email(new_tee_times_4_90)
-        else:
-            logger.info("No new tee times available for 4-90 days.")
-
-        previous_tee_times.update(current_tee_times_4_90)
-
+        previous_tee_times = current_tee_times
         time.sleep(600)  # Wait for 10 minutes (600 seconds) before running the script again
     except Exception as e:
         logger.error(f"Error in main loop: {e}")
         time.sleep(600)  # Wait for 10 minutes before retrying
+
+
+# while True:
+#     try:
+#         # Check tee times for 0-3 days
+#         driver_0_3 = login_and_navigate_0_3()
+#         current_tee_times_0_3 = get_tee_times(driver_0_3)
+#         driver_0_3.quit()
+
+#         logger.info("All available tee times for 0-3 days:")
+#         for date, times in current_tee_times_0_3.items():
+#             logger.info(f"Date: {date}")
+#             if times["daygolf"]:
+#                 logger.info("Daygolf Tee Times:")
+#                 for tee_time in times["daygolf"]:
+#                     logger.info(tee_time)
+#             if times["twilight"]:
+#                 logger.info("Twilight Tee Times:")
+#                 for tee_time in times["twilight"]:
+#                     logger.info(tee_time)
+
+#         new_tee_times_0_3 = compare_tee_times(previous_tee_times, current_tee_times_0_3, alert_start_time, alert_end_time)
+
+#         if new_tee_times_0_3:
+#             logger.info("New Tee Times for 0-3 days:")
+#             for date, times in new_tee_times_0_3.items():
+#                 logger.info(f"Date: {date}")
+#                 if times["daygolf"]:
+#                     logger.info("Daygolf Tee Times:")
+#                     for tee_time in times["daygolf"]:
+#                         logger.info(tee_time)
+#                 if times["twilight"]:
+#                     logger.info("Twilight Tee Times:")
+#                     for tee_time in times["twilight"]:
+#                         logger.info(tee_time)
+
+#             send_email(new_tee_times_0_3)
+#         else:
+#             logger.info("No new tee times available for 0-3 days.")
+
+#         previous_tee_times.update(current_tee_times_0_3)
+
+#         # Check tee times for 4-90 days
+#         driver_4_90 = login_and_navigate_4_90()
+#         current_tee_times_4_90 = get_tee_times(driver_4_90)
+#         driver_4_90.quit()
+
+#         logger.info("All available tee times for 4-90 days:")
+#         for date, times in current_tee_times_4_90.items():
+#             logger.info(f"Date: {date}")
+#             if times["daygolf"]:
+#                 logger.info("Daygolf Tee Times:")
+#                 for tee_time in times["daygolf"]:
+#                     logger.info(tee_time)
+#             if times["twilight"]:
+#                 logger.info("Twilight Tee Times:")
+#                 for tee_time in times["twilight"]:
+#                     logger.info(tee_time)
+
+#         new_tee_times_4_90 = compare_tee_times(previous_tee_times, current_tee_times_4_90, alert_start_time, alert_end_time)
+
+#         if new_tee_times_4_90:
+#             logger.info("New Tee Times for 4-90 days:")
+#             for date, times in new_tee_times_4_90.items():
+#                 logger.info(f"Date: {date}")
+#                 if times["daygolf"]:
+#                     logger.info("Daygolf Tee Times:")
+#                     for tee_time in times["daygolf"]:
+#                         logger.info(tee_time)
+#                 if times["twilight"]:
+#                     logger.info("Twilight Tee Times:")
+#                     for tee_time in times["twilight"]:
+#                         logger.info(tee_time)
+
+#             send_email(new_tee_times_4_90)
+#         else:
+#             logger.info("No new tee times available for 4-90 days.")
+
+#         previous_tee_times.update(current_tee_times_4_90)
+
+#         time.sleep(600)  # Wait for 10 minutes (600 seconds) before running the script again
+#     except Exception as e:
+#         logger.error(f"Error in main loop: {e}")
+#         time.sleep(600)  # Wait for 10 minutes before retrying

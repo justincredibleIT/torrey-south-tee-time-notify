@@ -30,7 +30,8 @@ ENV TEE_TIMES_PASSWORD=""
 ENV EMAIL_FROM=""
 ENV EMAIL_TO=""
 ENV GMAIL_APP_PASSWORD=""
-ENV ALERT_TIMES=""
+ENV ALERT_TIMES_WEEKDAY=""
+ENV ALERT_TIMES_WEEKEND=""
 
 # Set environment variable to indicate config file path
 #ENV CONFIG_FILE_PATH=/config.yml
